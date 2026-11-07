@@ -13,7 +13,6 @@ IMAGES = settings.BASE_DIR.parent / "bill_images"
 
 
 class Command(BaseCommand):
-    help = "Read every demo bill image with OCR and save it, using truth.json as the human check step."
 
     def handle(self, *args, **options):
         truth_file = IMAGES / "truth.json"
