@@ -1,0 +1,93 @@
+{% extends "base.html" %}
+{% block title %}Bill {{ view.kwargs.bill_id }}{% endblock %}
+{% block content %}
+<div class="page-head" style="display:flex;justify-content:space-between;align-items:end;gap:16px;flex-wrap:wrap">
+  <div>
+    <p><a href="{% url 'bills' %}">← All bills</a></p>
+    <h1 id="title">Bill</h1>
+  </div>
+  <form id="lookup" class="lookup">
+    <input id="lookup-id" placeholder="Find bill ID, e.g. B-1001" maxlength="20" aria-label="Bill ID">
+    <button class="btn" type="submit">Open</button>
+  </form>
+</div>
+<div id="alert" class="alert hidden"></div>
+<div id="loading" class="status"><span class="spinner"></span><span>Loading bill…</span></div>
+<div id="content" class="detail-grid hidden">
+  <div class="card">
+    <h2>Bill details</h2>
+    <dl class="kv">
+      <dt>Bill ID</dt><dd id="d-bill-id"></dd>
+      <dt>Customer</dt><dd id="d-customer"></dd>
+      <dt>Mobile</dt><dd id="d-mobile"></dd>
+      <dt>Printed on bill</dt><dd id="d-printed"></dd>
+      <dt>Total amount</dt><dd id="d-total"></dd>
+      <dt>Saved at</dt><dd id="d-created"></dd>
+    </dl>
+    <div class="table-wrap">
+      <table>
+        <thead><tr><th>Item</th><th class="num">Qty</th><th class="num">Amount</th></tr></thead>
+        <tbody id="d-items"></tbody>
+      </table>
+    </div>
+    <details style="margin-top:18px">
+      <summary>Full text read by OCR</summary>
+      <pre id="d-ocr" class="ocr-text"></pre>
+    </details>
+  </div>
+  <div class="card">
+    <h2>Bill image</h2>
+    <div class="preview"><img id="d-image" alt="Bill image"></div>
+  </div>
+</div>
+{{ view.kwargs.bill_id|json_script:"bill-id" }}
+{% endblock %}
+{% block scripts %}
+<script>
+  requireLogin();
+  const billId = JSON.parse(document.getElementById("bill-id").textContent).toUpperCase();
+  const alertBox = document.getElementById("alert");
+  const set = (id, text) => { document.getElementById(id).textContent = text; };
+
+  document.getElementById("lookup").addEventListener("submit", (event) => {
+    event.preventDefault();
+    const value = document.getElementById("lookup-id").value.trim().toUpperCase();
+    if (!/^B-\d{4,10}$/.test(value)) { showAlert(alertBox, "Bill ID must look like B-1001.", "warn"); return; }
+    location.href = `/account/bills/${encodeURIComponent(value)}/`;
+  });
+
+  async function loadImage(url) {
+    const response = await apiFetch(url);
+    if (!response.ok) return;
+    document.getElementById("d-image").src = URL.createObjectURL(await response.blob());
+  }
+
+  async function load() {
+    document.title = `Bill ${billId} · Smart Billing`;
+    set("title", `Bill ${billId}`);
+    try {
+      const bill = await apiJson(`/account/api/bills/${encodeURIComponent(billId)}/`);
+      set("d-bill-id", bill.bill_id);
+      set("d-customer", bill.customer_name);
+      set("d-mobile", bill.customer_mobile);
+      set("d-printed", printedText(bill.printed_at));
+      set("d-total", money(bill.total_amount));
+      set("d-created", printedText(bill.created_at));
+      set("d-ocr", bill.ocr_text || "No OCR text was saved.");
+      document.getElementById("d-items").replaceChildren(...bill.products.map(item => el("tr", {},
+        el("td", { text: item.name }),
+        el("td", { class: "num", text: item.qty }),
+        el("td", { class: "num", text: money(item.amount) }),
+      )));
+      document.getElementById("content").classList.remove("hidden");
+      loadImage(bill.image_url);
+    } catch (error) {
+      showAlert(alertBox, error.status === 404 ? `No bill found with ID ${billId}.` : error.message, error.status === 404 ? "warn" : "bad");
+    } finally {
+      document.getElementById("loading").classList.add("hidden");
+    }
+  }
+
+  load();
+</script>
+{% endblock %}

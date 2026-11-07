@@ -1,0 +1,76 @@
+{% extends "base.html" %}
+{% load static %}
+{% block title %}New Bill{% endblock %}
+{% block content %}
+<div class="page-head">
+  <h1>New bill</h1>
+  <p>Upload a bill image. The form fills itself from the text it reads. Check every field, correct anything wrong, then save.</p>
+</div>
+<div class="grid-2">
+  <div class="card">
+    <h2>1. Upload bill image</h2>
+    <label id="dropzone" class="dropzone" for="image">
+      <strong>Click to choose an image</strong>
+      <span class="hint">or drag it here · PNG or JPEG · up to 5 MB</span>
+    </label>
+    <input id="image" type="file" accept="image/png,image/jpeg" class="hidden">
+    <div id="status" class="status hidden"></div>
+    <div id="preview" class="preview hidden"><img id="preview-img" alt="Selected bill image"></div>
+  </div>
+
+  <div class="card">
+    <h2>2. Check and save</h2>
+    <div id="alert" class="alert hidden"></div>
+    <form id="bill-form" novalidate>
+      <div class="field-row">
+        <div class="field">
+          <label for="bill_id">Bill ID</label>
+          <input id="bill_id" name="bill_id" placeholder="B-1001" maxlength="20" required>
+        </div>
+        <div class="field">
+          <label for="printed_at">Printed date and time</label>
+          <input id="printed_at" name="printed_at" type="datetime-local" required>
+        </div>
+      </div>
+
+      <div class="field">
+        <label for="customer">Customer</label>
+        <select id="customer" name="customer" required>
+          <option value="">Select a customer…</option>
+        </select>
+        <div id="match-info" class="hint">Name and mobile read from the image are used to pick the customer.</div>
+      </div>
+
+      <div class="field">
+        <label>Products</label>
+        <div class="table-wrap">
+          <table class="items">
+            <thead><tr><th>Item</th><th class="col-qty">Qty</th><th class="col-amount num">Amount</th><th class="col-del"></th></tr></thead>
+            <tbody id="items"></tbody>
+          </table>
+        </div>
+        <div><button id="add-item" class="btn btn-light" type="button">+ Add product</button></div>
+      </div>
+
+      <div class="field">
+        <label for="total_amount">Total amount</label>
+        <input id="total_amount" name="total_amount" type="number" min="0" step="0.01" inputmode="decimal" required>
+        <div class="total-line"><span id="sum-text" class="hint">Items add up to Tk 0.00</span><span id="sum-badge"></span></div>
+      </div>
+
+      <details id="ocr-box">
+        <summary>Full text read from the image</summary>
+        <pre id="ocr-text" class="ocr-text">Upload an image to see the text.</pre>
+      </details>
+
+      <div class="toolbar" style="margin-top:18px">
+        <button id="save" class="btn" type="submit" disabled>Save bill</button>
+        <button id="clear" class="btn btn-light" type="button">Clear</button>
+      </div>
+    </form>
+  </div>
+</div>
+{% endblock %}
+{% block scripts %}
+<script src="{% static 'js/billing.js' %}"></script>
+{% endblock %}

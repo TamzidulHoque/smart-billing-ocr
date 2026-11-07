@@ -1,0 +1,115 @@
+{% extends "base.html" %}
+{% block title %}Bills{% endblock %}
+{% block content %}
+<div class="page-head">
+  <h1>Bills</h1>
+  <p>Search by bill ID or customer name, filter by customer or printed date, and open a bill to see its details.</p>
+</div>
+<div class="card">
+  <div class="toolbar">
+    <div class="field grow">
+      <label for="search">Search</label>
+      <input id="search" type="search" placeholder="Bill ID or customer name">
+    </div>
+    <div class="field">
+      <label for="customer">Customer</label>
+      <select id="customer"><option value="">All customers</option></select>
+    </div>
+    <div class="field">
+      <label for="printed_from">Printed from</label>
+      <input id="printed_from" type="date">
+    </div>
+    <div class="field">
+      <label for="printed_to">Printed to</label>
+      <input id="printed_to" type="date">
+    </div>
+    <div class="field">
+      <label for="ordering">Sort by</label>
+      <select id="ordering">
+        <option value="-printed_at">Newest printed</option>
+        <option value="printed_at">Oldest printed</option>
+        <option value="bill_id">Bill ID (A–Z)</option>
+        <option value="-bill_id">Bill ID (Z–A)</option>
+        <option value="-total_amount">Highest total</option>
+        <option value="total_amount">Lowest total</option>
+        <option value="-created_at">Recently saved</option>
+      </select>
+    </div>
+    <button id="reset" class="btn btn-light" type="button">Clear</button>
+  </div>
+  <div id="alert" class="alert hidden"></div>
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>Bill ID</th><th>Customer</th><th>Mobile</th><th>Printed</th><th class="num">Items</th><th class="num">Total</th></tr></thead>
+      <tbody id="rows"></tbody>
+    </table>
+  </div>
+  <div id="pager" class="pager"></div>
+</div>
+{% endblock %}
+{% block scripts %}
+<script>
+  requireLogin();
+  const PAGE_SIZE = 10;
+  const ids = ["search", "customer", "printed_from", "printed_to", "ordering"];
+  const inputs = Object.fromEntries(ids.map(id => [id, document.getElementById(id)]));
+  const rows = document.getElementById("rows");
+  const pager = document.getElementById("pager");
+  const alertBox = document.getElementById("alert");
+  let page = 1;
+  let timer;
+
+  async function loadCustomers() {
+    try {
+      const data = await apiJson("/account/api/registrations/?page_size=100&ordering=name");
+      inputs.customer.append(...data.results.map(c => el("option", { value: c.id, text: c.name })));
+    } catch (error) {
+      showAlert(alertBox, error.message);
+    }
+  }
+
+  async function load() {
+    hideAlert(alertBox);
+    if (inputs.printed_from.value && inputs.printed_to.value && inputs.printed_from.value > inputs.printed_to.value) {
+      showAlert(alertBox, "\"Printed from\" must be on or before \"Printed to\".", "warn");
+      return;
+    }
+    const params = new URLSearchParams({ page, page_size: PAGE_SIZE });
+    for (const id of ids) {
+      const value = inputs[id].value.trim();
+      if (value) params.set(id, value);
+    }
+    try {
+      const data = await apiJson(`/account/api/bills/?${params}`);
+      rows.replaceChildren(...(data.results.length ? data.results.map(bill => {
+        const href = `/account/bills/${encodeURIComponent(bill.bill_id)}/`;
+        return el("tr", { class: "clickable", onclick: () => { location.href = href; } },
+          el("td", {}, el("a", { href, text: bill.bill_id })),
+          el("td", { text: bill.customer_name }),
+          el("td", { text: bill.customer_mobile }),
+          el("td", { text: printedText(bill.printed_at) }),
+          el("td", { class: "num", text: bill.products.length }),
+          el("td", { class: "num", text: money(bill.total_amount) }),
+        );
+      }) : [el("tr", {}, el("td", { class: "empty", colspan: 6, text: "No bills match these filters." }))]));
+      renderPager(pager, { ...data, pageSize: PAGE_SIZE }, page, (p) => { page = p; load(); });
+    } catch (error) {
+      showAlert(alertBox, error.message);
+    }
+  }
+
+  inputs.search.addEventListener("input", () => {
+    clearTimeout(timer);
+    timer = setTimeout(() => { page = 1; load(); }, 300);
+  });
+  ["customer", "printed_from", "printed_to", "ordering"].forEach(id => inputs[id].addEventListener("change", () => { page = 1; load(); }));
+  document.getElementById("reset").addEventListener("click", () => {
+    ids.forEach(id => { inputs[id].value = id === "ordering" ? "-printed_at" : ""; });
+    page = 1;
+    load();
+  });
+
+  loadCustomers();
+  load();
+</script>
+{% endblock %}

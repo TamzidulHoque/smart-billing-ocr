@@ -1,0 +1,115 @@
+{% extends "base.html" %}
+{% block title %}Customers{% endblock %}
+{% block content %}
+<div class="page-head">
+  <h1>Customers</h1>
+  <p>Register customers so bills can be linked to them by name and mobile number.</p>
+</div>
+<div class="grid-2">
+  <div class="card">
+    <h2>Register customer</h2>
+    <div id="form-alert" class="alert hidden"></div>
+    <form id="customer-form" novalidate>
+      <div class="field">
+        <label for="name">Full name</label>
+        <input id="name" name="name" maxlength="100" required>
+      </div>
+      <div class="field">
+        <label for="email">Email</label>
+        <input id="email" name="email" type="email" required>
+      </div>
+      <div class="field">
+        <label for="mobile">Mobile</label>
+        <input id="mobile" name="mobile" inputmode="numeric" maxlength="11" placeholder="01XXXXXXXXX" required>
+      </div>
+      <div class="field">
+        <label for="date_of_birth">Date of birth <span class="hint">(optional)</span></label>
+        <input id="date_of_birth" name="date_of_birth" type="date">
+      </div>
+      <button id="save" class="btn btn-block" type="submit">Register</button>
+    </form>
+  </div>
+  <div class="card">
+    <h2>All customers</h2>
+    <div class="toolbar">
+      <div class="field grow">
+        <label for="search">Search</label>
+        <input id="search" type="search" placeholder="Name, email or mobile">
+      </div>
+    </div>
+    <div id="list-alert" class="alert hidden"></div>
+    <div class="table-wrap">
+      <table>
+        <thead><tr><th>Name</th><th>Email</th><th>Mobile</th><th>Date of birth</th></tr></thead>
+        <tbody id="rows"></tbody>
+      </table>
+    </div>
+    <div id="pager" class="pager"></div>
+  </div>
+</div>
+{% endblock %}
+{% block scripts %}
+<script>
+  requireLogin();
+  const PAGE_SIZE = 10;
+  const form = document.getElementById("customer-form");
+  const formAlert = document.getElementById("form-alert");
+  const listAlert = document.getElementById("list-alert");
+  const rows = document.getElementById("rows");
+  const search = document.getElementById("search");
+  const pager = document.getElementById("pager");
+  let page = 1;
+  let timer;
+
+  async function load() {
+    hideAlert(listAlert);
+    const params = new URLSearchParams({ page, page_size: PAGE_SIZE, ordering: "name" });
+    if (search.value.trim()) params.set("search", search.value.trim());
+    try {
+      const data = await apiJson(`/account/api/registrations/?${params}`);
+      rows.replaceChildren(...(data.results.length ? data.results.map(c => el("tr", {},
+        el("td", { text: c.name }),
+        el("td", { text: c.email }),
+        el("td", { text: c.mobile }),
+        el("td", { text: c.date_of_birth || "-" }),
+      )) : [el("tr", {}, el("td", { class: "empty", colspan: 4, text: "No customers found." }))]));
+      renderPager(pager, { ...data, pageSize: PAGE_SIZE }, page, (p) => { page = p; load(); });
+    } catch (error) {
+      showAlert(listAlert, error.message);
+    }
+  }
+
+  search.addEventListener("input", () => {
+    clearTimeout(timer);
+    timer = setTimeout(() => { page = 1; load(); }, 300);
+  });
+
+  form.addEventListener("submit", async (event) => {
+    event.preventDefault();
+    hideAlert(formAlert);
+    const body = {
+      name: form.name.value.trim(),
+      email: form.email.value.trim(),
+      mobile: form.mobile.value.trim(),
+      date_of_birth: form.date_of_birth.value || null,
+    };
+    if (!body.name || !body.email || !body.mobile) { showAlert(formAlert, "Name, email and mobile are required."); return; }
+    if (!/^01\d{9}$/.test(body.mobile)) { showAlert(formAlert, "Mobile must be 11 digits and start with 01."); return; }
+    const button = document.getElementById("save");
+    button.disabled = true;
+    try {
+      await apiJson("/account/api/registrations/", { method: "POST", json: body });
+      form.reset();
+      toast(`${body.name} registered.`);
+      page = 1;
+      load();
+    } catch (error) {
+      showAlert(formAlert, error.message);
+    } finally {
+      button.disabled = false;
+    }
+  });
+
+  load();
+</script>
+{% endblock %}

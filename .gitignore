@@ -1,0 +1,9 @@
+.venv/
+__pycache__/
+*.pyc
+.env
+crm/db.sqlite3
+crm/media/
+.vscode/
+.idea/
+.playwright-mcp/

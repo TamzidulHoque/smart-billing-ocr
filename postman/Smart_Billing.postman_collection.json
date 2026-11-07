@@ -1,0 +1,497 @@
+{
+  "info": {
+    "name": "Smart Billing with OCR",
+    "description": "Login, OCR upload, save bill, get bill by bill ID, search/filter, and a 401 example.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "auth": {
+    "type": "bearer",
+    "bearer": [
+      {
+        "key": "token",
+        "value": "{{access_token}}",
+        "type": "string"
+      }
+    ]
+  },
+  "variable": [
+    {
+      "key": "base_url",
+      "value": "http://127.0.0.1:8001"
+    },
+    {
+      "key": "email",
+      "value": "staff@example.com"
+    },
+    {
+      "key": "password",
+      "value": ""
+    },
+    {
+      "key": "access_token",
+      "value": ""
+    },
+    {
+      "key": "refresh_token",
+      "value": ""
+    },
+    {
+      "key": "bill_id",
+      "value": "B-1001"
+    },
+    {
+      "key": "customer_id",
+      "value": ""
+    },
+    {
+      "key": "products",
+      "value": ""
+    },
+    {
+      "key": "total_amount",
+      "value": ""
+    },
+    {
+      "key": "printed_at",
+      "value": ""
+    },
+    {
+      "key": "ocr_text",
+      "value": ""
+    }
+  ],
+  "item": [
+    {
+      "name": "1. Login (get access token)",
+      "request": {
+        "method": "POST",
+        "header": [],
+        "url": {
+          "raw": "{{base_url}}/account/api/login/",
+          "host": [
+            "{{base_url}}"
+          ],
+          "path": [
+            "account",
+            "api",
+            "login"
+          ]
+        },
+        "description": "Saves the access and refresh tokens into collection variables.",
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"email\": \"{{email}}\",\n  \"password\": \"{{password}}\"\n}",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        },
+        "auth": {
+          "type": "noauth"
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('200 OK', () => pm.response.to.have.status(200));",
+              "if (pm.response.code === 200) {",
+              "  pm.collectionVariables.set('access_token', pm.response.json().access);",
+              "  pm.collectionVariables.set('refresh_token', pm.response.json().refresh);",
+              "}"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "2. Refresh access token",
+      "request": {
+        "method": "POST",
+        "header": [],
+        "url": {
+          "raw": "{{base_url}}/account/api/token/refresh/",
+          "host": [
+            "{{base_url}}"
+          ],
+          "path": [
+            "account",
+            "api",
+            "token",
+            "refresh"
+          ]
+        },
+        "description": "",
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"refresh\": \"{{refresh_token}}\"\n}",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        },
+        "auth": {
+          "type": "noauth"
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "if (pm.response.code === 200) pm.collectionVariables.set('access_token', pm.response.json().access);"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "3. No token → 401",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "{{base_url}}/account/api/bills/",
+          "host": [
+            "{{base_url}}"
+          ],
+          "path": [
+            "account",
+            "api",
+            "bills"
+          ]
+        },
+        "description": "",
+        "auth": {
+          "type": "noauth"
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('401 without token', () => pm.response.to.have.status(401));"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "4. OCR: upload bill image",
+      "request": {
+        "method": "POST",
+        "header": [],
+        "url": {
+          "raw": "{{base_url}}/account/api/ocr/",
+          "host": [
+            "{{base_url}}"
+          ],
+          "path": [
+            "account",
+            "api",
+            "ocr"
+          ]
+        },
+        "description": "In Body → form-data, choose a file from bill_images/ for the 'image' key. The response values are copied into collection variables for the next request.",
+        "body": {
+          "mode": "formdata",
+          "formdata": [
+            {
+              "key": "image",
+              "type": "file",
+              "src": []
+            }
+          ]
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('200 OK', () => pm.response.to.have.status(200));",
+              "const r = pm.response.json();",
+              "pm.collectionVariables.set('bill_id', r.bill_id || '');",
+              "pm.collectionVariables.set('ocr_text', r.full_text || '');",
+              "if (r.matched_customer) pm.collectionVariables.set('customer_id', r.matched_customer.id);",
+              "pm.collectionVariables.set('products', JSON.stringify(r.products || []));",
+              "pm.collectionVariables.set('total_amount', r.total_amount || '');",
+              "pm.collectionVariables.set('printed_at', r.printed_at || '');"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "5. Save bill",
+      "request": {
+        "method": "POST",
+        "header": [],
+        "url": {
+          "raw": "{{base_url}}/account/api/bills/",
+          "host": [
+            "{{base_url}}"
+          ],
+          "path": [
+            "account",
+            "api",
+            "bills"
+          ]
+        },
+        "description": "Choose the same image file for 'bill_image'. Check and correct the text values before sending.",
+        "body": {
+          "mode": "formdata",
+          "formdata": [
+            {
+              "key": "bill_id",
+              "value": "{{bill_id}}",
+              "type": "text"
+            },
+            {
+              "key": "customer",
+              "value": "{{customer_id}}",
+              "type": "text"
+            },
+            {
+              "key": "products",
+              "value": "{{products}}",
+              "type": "text"
+            },
+            {
+              "key": "total_amount",
+              "value": "{{total_amount}}",
+              "type": "text"
+            },
+            {
+              "key": "printed_at",
+              "value": "{{printed_at}}",
+              "type": "text"
+            },
+            {
+              "key": "ocr_text",
+              "value": "{{ocr_text}}",
+              "type": "text"
+            },
+            {
+              "key": "bill_image",
+              "type": "file",
+              "src": []
+            }
+          ]
+        }
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('201 Created', () => pm.response.to.have.status(201));"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "6. Get bill by printed bill ID",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "{{base_url}}/account/api/bills/{{bill_id}}/",
+          "host": [
+            "{{base_url}}"
+          ],
+          "path": [
+            "account",
+            "api",
+            "bills",
+            "{{bill_id}}"
+          ]
+        },
+        "description": ""
+      },
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('200 OK', () => pm.response.to.have.status(200));"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "7. Search bills by bill ID",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "{{base_url}}/account/api/bills/?search=B-1001",
+          "host": [
+            "{{base_url}}"
+          ],
+          "path": [
+            "account",
+            "api",
+            "bills"
+          ],
+          "query": [
+            {
+              "key": "search",
+              "value": "B-1001"
+            }
+          ]
+        },
+        "description": ""
+      }
+    },
+    {
+      "name": "8. Search bills by customer name",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "{{base_url}}/account/api/bills/?search=rahim",
+          "host": [
+            "{{base_url}}"
+          ],
+          "path": [
+            "account",
+            "api",
+            "bills"
+          ],
+          "query": [
+            {
+              "key": "search",
+              "value": "rahim"
+            }
+          ]
+        },
+        "description": ""
+      }
+    },
+    {
+      "name": "9. Filter bills by customer",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "{{base_url}}/account/api/bills/?customer=1",
+          "host": [
+            "{{base_url}}"
+          ],
+          "path": [
+            "account",
+            "api",
+            "bills"
+          ],
+          "query": [
+            {
+              "key": "customer",
+              "value": "1"
+            }
+          ]
+        },
+        "description": ""
+      }
+    },
+    {
+      "name": "10. Filter bills by printed date",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "{{base_url}}/account/api/bills/?printed_from=2026-10-01&printed_to=2026-10-10",
+          "host": [
+            "{{base_url}}"
+          ],
+          "path": [
+            "account",
+            "api",
+            "bills"
+          ],
+          "query": [
+            {
+              "key": "printed_from",
+              "value": "2026-10-01"
+            },
+            {
+              "key": "printed_to",
+              "value": "2026-10-10"
+            }
+          ]
+        },
+        "description": ""
+      }
+    },
+    {
+      "name": "11. Ordering and pages",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "{{base_url}}/account/api/bills/?ordering=-total_amount&page_size=5&page=2",
+          "host": [
+            "{{base_url}}"
+          ],
+          "path": [
+            "account",
+            "api",
+            "bills"
+          ],
+          "query": [
+            {
+              "key": "ordering",
+              "value": "-total_amount"
+            },
+            {
+              "key": "page_size",
+              "value": "5"
+            },
+            {
+              "key": "page",
+              "value": "2"
+            }
+          ]
+        },
+        "description": ""
+      }
+    },
+    {
+      "name": "12. List customers",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "{{base_url}}/account/api/registrations/?search=",
+          "host": [
+            "{{base_url}}"
+          ],
+          "path": [
+            "account",
+            "api",
+            "registrations"
+          ],
+          "query": [
+            {
+              "key": "search",
+              "value": ""
+            }
+          ]
+        },
+        "description": ""
+      }
+    }
+  ]
+}
